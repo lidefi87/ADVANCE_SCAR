@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Fierro-Arcos"
+  given-names: "Denisse"
+  orcid: "https://orcid.org/"
+title: "QC workflow for Antarctic Phipoda dataset"
+version: 0.0.1
+doi: TBA
+date-released: 2023-09-25
+url: "https://github.com/lidefi87/ADVANCE_SCAR"
