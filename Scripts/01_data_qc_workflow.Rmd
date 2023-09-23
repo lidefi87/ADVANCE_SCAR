@@ -1,0 +1,75 @@
+---
+title: "Data Quality Control"
+author: "Denisse Fierro Arcos"
+date: "2023-09-23"
+output:
+  github_document:
+    toc: true
+    html_preview: false
+---
+
+# Quality Control (QC) workflow
+
+In this document, we will apply a quality control workflow to the [Antarctic Phipoda](https://ipt.biodiversity.aq/resource?r=2438_mista_ant_phipoda#anchor-downloads) dataset available from the IPT.
+
+## Loading libraries
+
+```{r message = F, warning = F}
+#Data manipulation and plotting
+library(tidyverse)
+#Downloading data
+library(curl)
+```
+  
+## Downloading data from IPT
+  
+First, we will provide the path to the folder where where we will store our data. We will call this folder `Data`, and it will be located in the main repository folder. If this folder does not yet exist, we will create it. 
+  
+```{r}
+#Defining location of data folder
+folder_out <- "../Data"
+
+#Checking if folder exists, if not, one will be created
+if(dir.exists(folder_out) == F){
+  dir.create(folder_out)
+}
+```
+  
+We are now ready to download our data from the IPT using the `curl` package.  
+  
+```{r}
+#Create full path to save downloaded data
+path_out <- file.path(folder_out, "Antarctic_Phipoda.zip")
+
+#Downloading files from IPT
+curl_download("https://ipt.biodiversity.aq/archive.do?r=2438_mista_ant_phipoda&v=1.1", 
+              destfile = path_out)
+
+#Unzipping files into the data folder
+unzip(path_out, exdir = folder_out)
+
+#Finally, we will get a list of all files downloaded
+file_list <- list.files(path = folder_out, full.names = T)
+#We can check results now
+file_list
+```
+  
+We can see that this dataset has a relatively simple structure as it only contains one core file: `occurrence.txt`, which contains information about where Antarctic Phipoda has been recorded. In this case, we can go ahead and load the `occurrence.txt` into our environment. The `xml` files provide metadata, which will not be looking into in this repository.  
+  
+## Loading data 
+  
+```{r}
+ant_phipoda <- read_delim(str_subset(file_list, ".*txt"), delim = "\t")
+#Checking contents
+glimpse(ant_phipoda)
+```
+```{r}
+library(rgif)
+y <- occ_download(pred("datasetKey", "667e0044-3ff1-4365-8ecf-e637c7b31fa4"))
+occ_download_wait('0005146-230918134249559')
+d <- occ_download_get('0005146-230918134249559') %>%
+    occ_download_import()
+
+```
+
+
