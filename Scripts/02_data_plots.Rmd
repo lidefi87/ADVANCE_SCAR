@@ -1,0 +1,70 @@
+---
+title: "02_data_plots"
+author: "Denisse Fierro Arcos"
+date: "2023-09-24"
+output:
+  github_document:
+    toc: true
+    html_preview: false
+---
+
+# Plotting Antarctic Phipoda data
+
+The first notebook in this repository shows the quality control workflow applied to the Antarctic Phipoda dataset available in GBIF. Here, we will use the cleaned dataset to create some plots.  
+  
+## Loading libraries
+  
+```{r message=F, warning=FALSE}
+library(tidyverse)
+library(treemap)
+library(ggOceanMaps)
+library(ggspatial)
+```
+  
+## Loading data
+Here we will load the cleaned dataset produced in the previous notebook.  
+  
+```{r}
+ant_phi <- read_csv("../Data/Antarctic_Phipoda_GBIF_QC.csv")
+#Checking structure
+glimpse(ant_phi)
+```
+  
+## Plotting data
+The first plot will show the number of individuals per family of Antarctic Phipoda included in the dataset.  
+  
+```{r}
+ant_phi %>% 
+  select(family, verbatimScientificName) %>% 
+  count(family, verbatimScientificName) %>% 
+  ungroup() %>% 
+  complete(verbatimScientificName, nesting(family)) %>% 
+  group_by(family) %>%
+  mutate(fam = sum(n, na.rm = T)) %>% 
+  unite("family", family, fam, sep = "\n") %>% 
+  treemap(., index = c("family"), vSize = "n",
+          fontsize.labels = 10, fontcolor.labels = "black",
+          align.labels = c("center", "center"),
+          overlap.labels = 0.5, border.col = "grey", 
+          palette = "Dark2", 
+          title = "Number of individual Antarctic Phipoda sampled per family in the Southern Ocean")
+```
+    
+Now we can create a map of observations. We will create a map with a South Pole Stereographic projection using the `ggOceanMaps` and `ggspatial` libraries.
+  
+```{r}
+#First, we state the northern most limit for our map
+#We also overlay the bathymetry
+basemap(limits = -30, bathymetry = T)+
+  #Now we overlay our data points
+  geom_spatial_point(data = ant_phi, color = "red", crs = 4326,
+                     aes(x = decimallongitude, y = decimallatitude))
+
+```
+  
+Any figures can be saved into memory using the `ggsave` function from `ggplot2`.  
+
+
+
+
+
