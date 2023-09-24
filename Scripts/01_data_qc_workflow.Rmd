@@ -10,18 +10,41 @@ output:
 
 # Quality Control (QC) workflow
 
-In this document, we will apply a quality control workflow to the [Antarctic Phipoda](https://ipt.biodiversity.aq/resource?r=2438_mista_ant_phipoda#anchor-downloads) dataset available from the IPT.
-
+In this document, we will apply a quality control workflow to the [Antarctic Phipoda](https://ipt.biodiversity.aq/resource?r=2438_mista_ant_phipoda#anchor-downloads) dataset available from GBIF. It should be noted that this dataset can be directly downloaded from the IPT using the `curl` library. However, I chose to use the `rgbif` package because it downloads the dataset from GBIF, which includes additional columns in the dataset that can help identify issues faster.  
+  
+Before being able to use this notebook to download data from GBIF, you need to get a free [GBIF](https://www.gbif.org/) account. Find your account details because you will need to share them with `R` as shown in the next chunk of code.  
+  
+This document can also be used as a report for quality control findings.  
+  
+## Setting up GBIF credentials
+Write your GBIF credentials in the section below. Once you are done, copy them.  
+  
+GBIF_USER="WRITE-YOUR-USERNAME"  
+GBIF_PWD="WRITE-YOUR-PASSWORD"  
+GBIF_EMAIL="WRITE-YOUR-EMAIL"  
+  
+Ensure the information given above refers to your GBIF account. Copy it, run the chunk of code below. This will open a new window with the name `.Renviron`. Paste your details in this window, save it, close it, and restart `R`.  
+  
+```{r eval=FALSE}
+usethis::edit_r_environ()
+```
+  
+You only need to set up your credentials once, so if you have already done this before, there is no need to do it again. Now you can run the code below with no issues.  
+    
 ## Loading libraries
 
 ```{r message = F, warning = F}
 #Data manipulation and plotting
 library(tidyverse)
-#Downloading data
-library(curl)
+library(janitor)
+#Downloading GBIF data and data cleaning
+library(rgbif)
+library(CoordinateCleaner)
+#Basemaps
+library(rnaturalearth)
 ```
   
-## Downloading data from IPT
+## Downloading data from GBIF
   
 First, we will provide the path to the folder where where we will store our data. We will call this folder `Data`, and it will be located in the main repository folder. If this folder does not yet exist, we will create it. 
   
@@ -35,21 +58,33 @@ if(dir.exists(folder_out) == F){
 }
 ```
   
-We are now ready to download our data from the IPT using the `curl` package.  
+We are now ready to download our data using the `rgbif` package. From the [dataset page](https://ipt.biodiversity.aq/resource?r=2438_mista_ant_phipoda#anchor-downloads), we will find the dataset ID or GBIF UUID. In this case, it is `667e0044-3ff1-4365-8ecf-e637c7b31fa4`. We will use this information to find and download the data.  
+  
+```{r eval=FALSE}
+#Find the Antarctic Phipoda dataset
+dataset_conn <- occ_download(pred("datasetKey", "667e0044-3ff1-4365-8ecf-e637c7b31fa4"))
+```
+  
+This make take a few minutes. You can check the status of download using `occ_download_wait(dataset_conn)`. Once it has SUCCEEDED, you can download it.  
+  
+```{r eval=FALSE}
+#We will download the data locally and also load it to a variable
+ant_phipoda <- occ_download_get(dataset_conn, path = folder_out) %>%
+    occ_download_import()
+```
+  
+The code above downloaded the data locally as a zip file, but it also loaded the data in the `ant_phipoda` variable. The section below shows how to extract data from a zip file using base `R`.  
   
 ```{r}
-#Create full path to save downloaded data
-path_out <- file.path(folder_out, "Antarctic_Phipoda.zip")
-
-#Downloading files from IPT
-curl_download("https://ipt.biodiversity.aq/archive.do?r=2438_mista_ant_phipoda&v=1.1", 
-              destfile = path_out)
+#We will unzip the file in a new subfolder
+path_out <- file.path(folder_out, "Antarctic_Phipoda")
 
 #Unzipping files into the data folder
-unzip(path_out, exdir = folder_out)
+zip_path <- list.files(folder_out, ".zip", full.names = T)
+unzip(zip_path, exdir = path_out)
 
 #Finally, we will get a list of all files downloaded
-file_list <- list.files(path = folder_out, full.names = T)
+file_list <- list.files(path = path_out, full.names = T)
 #We can check results now
 file_list
 ```
@@ -59,17 +94,247 @@ We can see that this dataset has a relatively simple structure as it only contai
 ## Loading data 
   
 ```{r}
-ant_phipoda <- read_delim(str_subset(file_list, ".*txt"), delim = "\t")
-#Checking contents
+#Loading data
+ant_phipoda <- read_delim(str_subset(file_list, "occurrence"), delim = "\t")
+```
+  
+We are getting a warning about issues with the data, we will check them now and correct them.
+  
+```{r}
+#Checking issues
+problems(ant_phipoda)
+```
+  
+We will look at the contents of the variables with issues. First we will find the name of `column 178`.   
+  
+```{r}
+names(ant_phipoda)[178]
+```
+  
+Based on the column name, `distanceFromCentroidInMeters`, this column should not be of boolean type as seen in the `expected` column of the problems identified. In this case, we will set the type of data of this column to float (i.e., decimals).
+  
+```{r}
+ant_phipoda <- ant_phipoda %>% 
+  #Changing column to numeric
+  mutate(distanceFromCentroidInMeters = as.numeric(distanceFromCentroidInMeters))
+```
+  
+Now, we will ensure the rows highlighted above contain the original information flagged as incorrect.  
+  
+```{r}
+ant_phipoda$distanceFromCentroidInMeters[c(1511,1516,1794)] <- 4.424179327278187E-10
+
+#Checking results are correct
+ant_phipoda %>% 
+  #Assigning row ID as column to verify correct rows has been corrected
+  rowid_to_column("id") %>% 
+  #Filtering rows with values corrected
+  filter(distanceFromCentroidInMeters < 1e-9) %>% 
+  #Showing ID and corrected column
+  select(id, distanceFromCentroidInMeters)
+```
+  
+We will now move onto performing some data cleaning. First, we will remove columns that are empty.  
+  
+```{r}
+ant_phipoda <- ant_phipoda %>% 
+  remove_empty("cols")
+
+#We will check the structure of the dataset
 glimpse(ant_phipoda)
 ```
+  
+We will use the information about issues contained in the dataset to start our data cleaning. We will plot our data quickly to find if there are any points with geospatial/coordinate issues.  
+  
 ```{r}
-library(rgif)
-y <- occ_download(pred("datasetKey", "667e0044-3ff1-4365-8ecf-e637c7b31fa4"))
-occ_download_wait('0005146-230918134249559')
-d <- occ_download_get('0005146-230918134249559') %>%
-    occ_download_import()
-
+ant_phipoda %>% 
+  ggplot(aes(x = decimalLongitude, y = decimalLatitude, colour = hasGeospatialIssues))+
+  geom_point(aes(shape = hasCoordinate))
 ```
+  
+There does not appear to be any any issues records with spatial issues, but there do seem to be some points on land at $80^{\circ}S$ and $90^{\circ}S$. We will get back to this later, we will now check the `issues` column to find if there are any other problems we should be aware of.  
+  
+```{r}
+ant_phipoda %>% 
+  separate_longer_delim(issue, ";") %>%
+  count(issue) %>% 
+  arrange(n)
+```
+    
+We will need to look into the taxon issues a little further to identify what are the next steps we can take to potentially correct this issue. The depth related issue should be looked into further if minimum and maximum depths are given with the data, but in our case this information was not provided, so we will ignore this. Country and continent derived coordinates is not a concern in this case because we are working with data from a single continent. The rounding of coordinates may not be a big issue as the precision is about $\sim 1 m$. We will ignore this flag for this exercise, but it is worth noting that about $90\%$ of all observations are affected by this issue.  
+  
+The assumed geodetic datum is a more concerning error as it can result in differences in the actual location of observations in the hundreds of meters. This is worth looking into further, particularly because it affects ALL observations in the dataset. Fortunately, `meta.xml` file shows that the default datum for this dataset is WGS84.  
+  
+This means that we can concentrate on checking taxon related issues.  
+  
+```{r}
+taxon_issues <- ant_phipoda %>% 
+  filter(str_detect(str_to_lower(issue), "taxon")) %>% 
+  select(scientificNameID:verbatimScientificName) %>% 
+  distinct()
+
+taxon_issues
+```
+  
+Using the `verbatimScientificName` column, we can use the `rgbif` package to search for potential matches.
+  
+```{r}
+taxon_matches <- name_backbone_checklist(taxon_issues$verbatimScientificName)
+taxon_matches
+```
+    
+We did not find results for all problematic reports, but we found that one of the species `Colomastix simplicicauda` was misspelled. We can correct this in the dataset.  
+  
+```{r}
+#Extracting data for the only 
+C_simpli <- taxon_matches %>% 
+  filter(usageKey == 2216848) %>% 
+  #Keeping only columns present in original data
+  select(any_of(names(taxon_issues)))
+
+#Correcting observations for problematic species
+csimp <- ant_phipoda %>%
+  #Filtering data
+  filter(verbatimScientificName == "Colomastix simplicicauda") %>% 
+  #Correcting name
+  mutate(species = C_simpli$species, vernacularName = C_simpli$species,
+         #Removing taxon related issue
+         issue = str_remove(issue, ";TAXON_.*")) %>% 
+  #Joining with correct data
+  left_join(C_simpli, by = "species") %>% 
+  #Removing duplicate columns
+  select(!contains(".x"))
+  
+#Correcting names before joining dataset
+names(csimp) <- str_remove(names(csimp), "\\.y")
+
+#Sorting columns as original dataset
+csimp <- csimp %>% 
+  select(all_of(names(ant_phipoda)))
+  
+#Attaching corrected observations to original dataset
+ant_phipoda <- ant_phipoda %>% 
+  filter(verbatimScientificName != "Colomastix simplicicauda") %>% 
+  bind_rows(csimp)
+
+#Checking result
+glimpse(ant_phipoda)
+```
+  
+We can check how many reamining cases of taxon issues we have left.  
+  
+```{r}
+taxon_issues %>% 
+  filter(verbatimScientificName != "Colomastix simplicicauda")
+```
+  
+We have 13 other cases, 11 of which do not have any matches and one of which has been identified as Mollusca. We will remove these 12 cases, but it is recommended that the information in the `vernacularName` is used to identified potential synonym species or changes to species names.  
+  
+```{r}
+#Identifying names of species to be removed
+species_removal <- taxon_issues %>% 
+  #Removing corrected species and species with taxon data
+  filter(verbatimScientificName != "Colomastix simplicicauda" & vernacularName != "Gammaropsis dimorpha") %>% 
+  pull(vernacularName)
+
+#Removing species from main dataset
+ant_phipoda <- ant_phipoda %>% 
+  filter(!vernacularName %in% species_removal)
+
+head(ant_phipoda)
+```
+  
+We will now use the `CoordinateCleaner` package to find other potential issues in our datasets. This step should identify the points on land we saw earlier.  
+  
+```{r}
+#Renaming coordinates to match CC package requirements
+ant_phipoda <- ant_phipoda %>% 
+  rename('decimallatitude' = "decimalLatitude", "decimallongitude" = "decimalLongitude")
+
+#Testing data
+test <- ant_phipoda %>% 
+  clean_coordinates()
+```
+  
+We can check a summary of results, which also provides the names of the columns we should select for filtering.  
+  
+```{r}
+summary(test)
+```
+  
+We will start with equal latitude and longitudes. We have 11 cases of these.
+
+```{r}
+test %>% 
+  filter(.equ == F) %>% 
+  select(decimallatitude, decimallongitude)
+```
+  
+This is likely a mistake, so we will remove them. The second flag was the at sea (`.sea`), we will use this to identify the points on land. We will do a quick plot to ensure we got them all.
+  
+```{r}
+#Base map of Antarctica
+antarctica <- ne_countries(continent = "Antarctica", returnclass = "sf")
+
+#Plotting Antarctica as base
+antarctica %>% 
+  ggplot()+
+  geom_sf()+
+  #Plotting data 
+  geom_point(inherit.aes = F, 
+             aes(x = decimallongitude, y = decimallatitude), 
+             #Selecting only points classified as land
+             data = test[test$.sea == T,])
+```
+  
+Most of the "land" points are in fact on land, but the one on the Antarctic Peninsula and the other near Kerguelen Island need to be further looked into. Since time is limited, we will assume all these points are in fact on land and we will remove them.  
+  
+Finally we will check the outlier cases (`.otl`) by plotting them in a map.  
+  
+```{r}
+#Plotting Antarctica as base
+antarctica %>% 
+  ggplot()+
+  geom_sf()+
+  #Plotting data 
+  geom_point(inherit.aes = F, 
+             aes(x = decimallongitude, y = decimallatitude, colour = .otl), 
+             #Selecting only points classified as land
+             data = test)+
+  facet_grid(.otl~.)
+```
+  
+It is not immediately clear why these observations were identified as outliers (`.otl` == FALSE). In this case, we will not remove them from the original data. Now we can remove the observations with issues.
+  
+```{r}
+#Removing problems observations
+ant_phipoda <- test %>% 
+  filter(.equ == T & .sea == F) %>% 
+  #Removing columns with information about testing
+  select(gbifID:iucnRedListCategory) %>% 
+  #Removing columns without data
+  remove_empty("cols")
+```
+  
+The final check is to ensure the `organismQuantity` reported matches the `occurrenceStatus`.  
+  
+```{r}
+ant_phipoda %>% 
+  distinct(organismQuantity, occurrenceStatus)
+```
+  
+Finally, we will save the cleaned dataset to create some plots.  
+  
+```{r}
+#Providing full path to save file
+out_clean <- file.path(folder_out, "Antarctic_Phipoda_GBIF_QC.csv")
+
+#Saving dataset as csv
+ant_phipoda %>% 
+  write_csv(file = out_clean)
+```
+
+
+
 
 
