@@ -67,7 +67,7 @@ dataset_conn <- occ_download(pred("datasetKey", "667e0044-3ff1-4365-8ecf-e637c7b
   
 This make take a few minutes. You can check the status of download using `occ_download_wait(dataset_conn)`. Once it has SUCCEEDED, you can download it.  
   
-```{r eval=FALSE}
+```{r eval=F}
 #We will download the data locally and also load it to a variable
 ant_phipoda <- occ_download_get(dataset_conn, path = folder_out) %>%
     occ_download_import()
@@ -314,6 +314,34 @@ ant_phipoda <- test %>%
   select(gbifID:iucnRedListCategory) %>% 
   #Removing columns without data
   remove_empty("cols")
+```
+  
+Checking data one more time to ensure any erroneous observations have been removed.  
+  
+```{r}
+antarctica %>% 
+  ggplot()+
+  geom_sf()+
+  #Plotting data 
+  geom_point(inherit.aes = F, 
+             aes(x = decimallongitude, y = decimallatitude), 
+             data = ant_phipoda)
+```
+  
+We can see that there is still a point on land that has not been removed. We will do this now.  
+  
+```{r}
+ant_phipoda <- ant_phipoda %>% 
+  filter(decimallatitude > -80)
+
+#Checking result
+antarctica %>% 
+  ggplot()+
+  geom_sf()+
+  #Plotting data 
+  geom_point(inherit.aes = F, 
+             aes(x = decimallongitude, y = decimallatitude), 
+             data = ant_phipoda)
 ```
   
 The final check is to ensure the `organismQuantity` reported matches the `occurrenceStatus`.  

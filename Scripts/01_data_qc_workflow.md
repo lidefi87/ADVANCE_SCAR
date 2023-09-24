@@ -739,6 +739,40 @@ ant_phipoda <- test %>%
   remove_empty("cols")
 ```
 
+Checking data one more time to ensure any erroneous observations have
+been removed.
+
+``` r
+antarctica %>% 
+  ggplot()+
+  geom_sf()+
+  #Plotting data 
+  geom_point(inherit.aes = F, 
+             aes(x = decimallongitude, y = decimallatitude), 
+             data = ant_phipoda)
+```
+
+![](01_data_qc_workflow_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+
+We can see that there is still a point on land that has not been
+removed. We will do this now.
+
+``` r
+ant_phipoda <- ant_phipoda %>% 
+  filter(decimallatitude > -80)
+
+#Checking result
+antarctica %>% 
+  ggplot()+
+  geom_sf()+
+  #Plotting data 
+  geom_point(inherit.aes = F, 
+             aes(x = decimallongitude, y = decimallatitude), 
+             data = ant_phipoda)
+```
+
+![](01_data_qc_workflow_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
+
 The final check is to ensure the `organismQuantity` reported matches the
 `occurrenceStatus`.
 
