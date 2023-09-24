@@ -3,16 +3,24 @@
 This repository was developed as part of the interview process for the Scientific Collaborator position at the Royal Belgian Institute of Natural Sciences.  
   
 The assignment involves the following tasks:  
-- Develop a workflow performing quality control checks on the [Antartic Phipoda](https://ipt.biodiversity.aq/resource?r=2438_mista_ant_phipoda) collection available in GBIF  
-- Create at least two plots using the QC data, one of which must be a map  
-- Prepare a report summarising data processing workflow and any important insights obtained during quality control  
+1. Develop a workflow performing quality control checks on the [Antartic Phipoda](https://ipt.biodiversity.aq/resource?r=2438_mista_ant_phipoda) collection available in GBIF  
+2. Prepare a report summarising data processing workflow and any important insights obtained during quality control  
+3. Create at least two plots using the QC data, one of which must be a map  
+  
+Points 1 and 2 are addressed by the `01_data_qc_workflow.Rmd` notebook, while the plots are included in `02_data_plots.Rmd`. For convenience, `.Rmd` files are provided so they can be easily run locally for testing, while the `.md` files are a markdown friendly version that has been included to avoid having to run the notebooks before seeing the final product.  
     
-
 ## Requirements
   
 This repository needs the following packages installed locally for it to run successfully:  
+- `usethis`  
 - `tidyverse`  
+- `janitor`  
+- `rgbif`  
 - `CoordinateCleaner`  
+- `rnaturalearth`  
+- `ggspatial`  
+- `ggOceanMaps`  
+- `treemap`  
   
 You can use the `Installing_R_libraries.R` included under the `Scripts` folder to check if any of these dependencies are not installed locally. If any libraries are missing, the code will automatically install them. To run the script copy the following lines into your RStudio console:  
   
@@ -36,13 +44,6 @@ locale:
 
 time zone: Australia/Hobart
 tzcode source: internal
-
-attached base packages:
-[1] stats     graphics  grDevices utils     datasets  methods   base     
-
-loaded via a namespace (and not attached):
- [1] compiler_4.3.1    fastmap_1.1.1     cli_3.6.1         htmltools_0.5.6   tools_4.3.1       rstudioapi_0.15.0 rmarkdown_2.24   
- [8] knitr_1.44        xfun_0.40         digest_0.6.33     rlang_1.1.1       evaluate_0.21    
 ```
   
 ## Additional information included in this repository
